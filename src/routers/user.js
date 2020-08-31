@@ -2,6 +2,18 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const User = require("../models/user");
 const router = new express.Router();
+const multer = require("multer");
+const uploads = multer({
+  limits: {
+    fileSize: 1000000,
+  },
+  fileFilter(req, file, cb) {
+    if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
+      return cb(new Error("Please Upload JPG, PNG, JPEG images"));
+    }
+    cb(undefined, true);
+  },
+});
 
 router.post("/users", async (req, res) => {
   const user = new User(req.body);
@@ -95,6 +107,39 @@ router.delete("/users/me", auth, async (req, res) => {
   } catch (e) {
     res.status(500).send();
   }
+});
+
+router.post(
+  "/users/me/avatar",
+  auth,
+  uploads.single("avatar"),
+  async (req, res) => {
+    req.user.avatar = req.file.buffer;
+    await req.user.save();
+    res.status(200).send();
+  },
+  (error, req, res, next) => {
+    res.status(400).send({ error: error.message });
+  }
+);
+
+router.get("/users/:id/avatar", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user || !user.avatar) {
+      throw new Error();
+    }
+    res.set("Content-Type", "image/jpg");
+    res.send(user.avatar);
+  } catch (e) {
+    res.status(404).send();
+  }
+});
+
+router.delete("/users/me/avatar", auth, async (req, res) => {
+  req.user.avatar = undefined;
+  await req.user.save();
+  res.status(200).send();
 });
 
 module.exports = router;
